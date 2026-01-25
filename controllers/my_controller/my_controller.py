@@ -4,14 +4,13 @@ import math
 import cv2
 import numpy as np
 
-# --- AYARLAR ---
 TARGET_X = -96.0   
 TARGET_Y = -96.0  
 MAX_SPEED = 40.0 
 STOP_DIST = 2.0 
 
-# --- GÖRÜNTÜ BÜYÜTME AYARI ---
-SCALE = 5  # Görüntüyü kaç kat büyütmek istediğini buraya yaz (Örn: 5 kat)
+# GÖRÜNTÜ BÜYÜTME
+SCALE = 5 
 
 def normalize_angle(angle):
     while angle > math.pi:
@@ -24,12 +23,10 @@ def run():
     driver = Driver()
     timestep = int(driver.getBasicTimeStep())
     
-    # --- 1. SENSÖRLERİ TANIMLA ---
     gps = driver.getDevice("gps")
     compass = driver.getDevice("compass")
     cam = driver.getDevice("camera") 
 
-    # --- 2. SENSÖRLERİ AKTİF ET ---
     if gps:
         gps.enable(timestep)
     if compass:
@@ -37,44 +34,34 @@ def run():
     if cam:
         cam.enable(timestep)
 
-    # --- 3. DÜZELTME BURADA (WARM-UP) ---
-    print("Sensörler başlatılıyor, lütfen bekleyin...")
+    print("Sensörler başlatılıyor")
     for _ in range(20): 
         driver.step()
 
     print(f"Hedef: X={TARGET_X}, Y={TARGET_Y}")
 
-    # --- ANA DÖNGÜ ---
     while driver.step() != -1:
         
-        # --- GÖRÜNTÜ İŞLEME KISMI ---
+        # GÖRÜNTÜ İŞLEME
         if cam:
             try:
                 camera_data = cam.getImage()
                 
                 if camera_data:
-                    # Orijinal küçük görüntü
                     raw_image = np.frombuffer(camera_data, np.uint8).reshape((cam.getHeight(), cam.getWidth(), 4))
                     frame_bgr = raw_image[:, :, :3] # Renkli
 
-                    # İşlemler
                     frame_gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY) # Gri
                     frame_blur = cv2.GaussianBlur(frame_gray, (5, 5), 0)
                     frame_canny = cv2.Canny(frame_blur, 50, 150) # Kenar
 
-                    # --- GÖRÜNTÜ BÜYÜTME (RESIZE) İŞLEMİ ---
-                    # Mevcut boyutları al
                     height, width = frame_bgr.shape[:2]
-                    # Yeni boyutları hesapla (SCALE ile çarp)
                     new_dim = (width * SCALE, height * SCALE)
 
-                    # Ekran için büyütülmüş kopyalar oluştur
-                    # interpolation=cv2.INTER_NEAREST -> Pikselleri net gösterir (bulanıklaştırmaz)
                     display_rgb = cv2.resize(frame_bgr, new_dim, interpolation=cv2.INTER_NEAREST)
                     display_gray = cv2.resize(frame_gray, new_dim, interpolation=cv2.INTER_NEAREST)
                     display_canny = cv2.resize(frame_canny, new_dim, interpolation=cv2.INTER_NEAREST)
 
-                    # --- BÜYÜTÜLMÜŞ EKRANLARI GÖSTER ---
                     cv2.imshow("1", display_rgb)
                     cv2.imshow("gri", display_gray)
                     cv2.imshow("kenarlar", display_canny)
@@ -84,7 +71,6 @@ def run():
             except Exception as e:
                 pass
 
-        # --- MEVCUT NAVİGASYON KODLARI ---
         if gps and compass:
             vals = gps.getValues()
             north = compass.getValues()

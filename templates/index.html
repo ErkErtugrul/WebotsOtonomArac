@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Otonom Araç Kontrol Paneli</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0d1117; --panel: #161b22; --border: #21262d;
+  --text: #c9d1d9; --muted: #484f58;
+  --cyan: #00e5ff; --green: #3fb950; --orange: #ff6b35;
+  --red: #f85149; --yellow: #f0c040; --purple: #a371f7;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ── TOP BAR ── */
+#topbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px; background: var(--panel);
+  border-bottom: 1px solid var(--border); flex-shrink: 0; z-index: 1000;
+  flex-wrap: wrap;
+}
+.logo { font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; color: var(--cyan); white-space: nowrap; }
+#conn-badge {
+  font-family: 'Space Mono', monospace; font-size: 10px;
+  padding: 3px 9px; border-radius: 4px;
+  background: rgba(248,81,73,.15); color: var(--red);
+  border: 1px solid rgba(248,81,73,.3); transition: all .3s;
+}
+#conn-badge.connected { background: rgba(63,185,80,.1); color: var(--green); border-color: rgba(63,185,80,.3); }
+
+/* Araç durum göstergesi */
+#status-badge {
+  font-family: 'Space Mono', monospace; font-size: 10px;
+  padding: 3px 12px; border-radius: 4px; letter-spacing: 1px;
+  transition: all .3s; border: 1px solid var(--border);
+}
+.status-BEKLIYOR  { background: rgba(72,79,88,.2);    color: var(--muted);   border-color: var(--border)  !important; }
+.status-HAREKET   { background: rgba(63,185,80,.12);   color: var(--green);   border-color: rgba(63,185,80,.3) !important; animation: pulse 1.5s infinite; }
+.status-DURDU     { background: rgba(240,192,64,.12);  color: var(--yellow);  border-color: rgba(240,192,64,.3) !important; }
+.status-ENGEL     { background: rgba(248,81,73,.15);   color: var(--red);     border-color: rgba(248,81,73,.3) !important; animation: pulse .8s infinite; }
+.status-TAMAMLANDI{ background: rgba(163,113,247,.12); color: var(--purple);  border-color: rgba(163,113,247,.3) !important; }
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+.sep { flex: 1; }
+
+/* Mode buttons */
+.mode-btn {
+  font-family: 'Space Mono', monospace; font-size: 10px;
+  padding: 5px 11px; border-radius: 5px; border: 1px solid var(--border);
+  background: transparent; color: var(--muted); cursor: pointer; transition: all .2s;
+}
+.mode-btn.active { background: rgba(0,229,255,.1); color: var(--cyan); border-color: rgba(0,229,255,.3); }
+.mode-btn:hover:not(.active) { border-color: var(--muted); color: var(--text); }
+
+/* Kontrol butonları */
+#btn-pause  { font-family: 'Space Mono', monospace; font-size: 10px; padding: 5px 12px; border-radius: 5px; border: 1px solid rgba(240,192,64,.4); background: rgba(240,192,64,.1); color: var(--yellow); cursor: pointer; transition: all .2s; }
+#btn-pause:hover  { background: rgba(240,192,64,.2); }
+#btn-resume { font-family: 'Space Mono', monospace; font-size: 10px; padding: 5px 12px; border-radius: 5px; border: 1px solid rgba(63,185,80,.4); background: rgba(63,185,80,.1); color: var(--green); cursor: pointer; display: none; transition: all .2s; }
+#btn-resume:hover { background: rgba(63,185,80,.2); }
+#btn-clear  { font-family: 'Space Mono', monospace; font-size: 10px; padding: 5px 12px; border-radius: 5px; border: 1px solid rgba(163,113,247,.4); background: rgba(163,113,247,.1); color: var(--purple); cursor: pointer; transition: all .2s; }
+#btn-clear:hover  { background: rgba(163,113,247,.2); }
+
+/* ── MAIN ── */
+#main { display: flex; flex: 1; overflow: hidden; }
+
+/* ── SIDEBAR ── */
+#sidebar { width: 270px; flex-shrink: 0; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; }
+.side-section { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.side-label { font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; }
+
+/* Telemetri */
+.telem-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.tcard { background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 8px 10px; }
+.tcard .val { font-family: 'Space Mono', monospace; font-size: 17px; font-weight: 700; color: #fff; line-height: 1; }
+.tcard .val.c { color: var(--cyan); } .tcard .val.g { color: var(--green); }
+.tcard .val.o { color: var(--orange); } .tcard .val.y { color: var(--yellow); }
+.tcard .lbl { font-size: 10px; color: var(--muted); margin-top: 3px; }
+
+/* Rota bilgisi */
+.route-stat { font-size: 12px; line-height: 1.9; }
+.route-stat span { color: var(--muted); }
+
+/* Waypoint listesi */
+#wp-scroll { max-height: 180px; overflow-y: auto; }
+.wp-item { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 11px; border-bottom: 1px solid var(--border); color: var(--muted); font-family: 'Space Mono', monospace; }
+.wp-item:last-child { border-bottom: none; }
+.wp-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+.wp-item.active .wp-dot { background: var(--cyan); box-shadow: 0 0 5px var(--cyan); }
+.wp-item.active { color: var(--cyan); }
+.wp-item.done { opacity: .35; text-decoration: line-through; }
+#wp-empty { font-size: 11px; color: var(--muted); font-family: 'Space Mono', monospace; }
+
+/* Log */
+#log-wrap { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+#log-box { flex: 1; padding: 10px 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
+.log-entry { font-family: 'Space Mono', monospace; font-size: 10px; padding: 4px 7px; border-radius: 3px; background: var(--bg); border-left: 2px solid var(--border); line-height: 1.4; }
+.log-entry.success { border-color: var(--green); color: var(--green); }
+.log-entry.error   { border-color: var(--red); color: var(--red); }
+.log-entry.warning { border-color: var(--yellow); color: var(--yellow); }
+.log-entry.info    { border-color: var(--cyan); color: var(--cyan); }
+
+/* ── MAP ── */
+#map-wrap { flex: 1; position: relative; }
+#map { width: 100%; height: 100%; }
+#map-hint {
+  position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
+  z-index: 1000; background: rgba(13,17,23,.92); border: 1px solid var(--border);
+  border-radius: 7px; padding: 7px 14px; font-family: 'Space Mono', monospace;
+  font-size: 11px; color: var(--cyan); pointer-events: none; white-space: nowrap;
+}
+.leaflet-container { background: #1a1f2b; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="logo">⬡ OTONOM ARAÇ</div>
+  <div id="conn-badge">● KESİLDİ</div>
+  <div id="status-badge" class="status-BEKLIYOR">● BEKLIYOR</div>
+  <div class="sep"></div>
+  <button class="mode-btn active" id="btn-route"  onclick="setMode('route')">ROTA</button>
+  <button class="mode-btn"        id="btn-single" onclick="setMode('single')">TEKLİ</button>
+  <button id="btn-pause"  onclick="pauseVehicle()">⏸ DURAKLAT</button>
+  <button id="btn-resume" onclick="resumeVehicle()">▶ DEVAM</button>
+  <button id="btn-clear"  onclick="clearRoute()">🗑 ROTAYI TEMİZLE</button>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+
+    <!-- Telemetri -->
+    <div class="side-section">
+      <div class="side-label">Telemetri</div>
+      <div class="telem-grid">
+        <div class="tcard"><div class="val c" id="t-speed">—</div><div class="lbl">Hız (km/h)</div></div>
+        <div class="tcard"><div class="val g" id="t-dist">—</div><div class="lbl">Hedefe (m)</div></div>
+        <div class="tcard"><div class="val o" id="t-heading">—</div><div class="lbl">Başlık (°)</div></div>
+        <div class="tcard"><div class="val y" id="t-wps">—</div><div class="lbl">Kalan WP</div></div>
+      </div>
+    </div>
+
+    <!-- Rota Bilgisi -->
+    <div class="side-section" id="route-info-section" style="display:none">
+      <div class="side-label">Aktif Rota</div>
+      <div class="route-stat">
+        <span>Mesafe:</span> <strong id="ri-dist">—</strong><br>
+        <span>Süre:</span>   <strong id="ri-dur">—</strong><br>
+        <span>Toplam WP:</span> <strong id="ri-total">—</strong>
+      </div>
+    </div>
+
+    <!-- Waypoint Listesi -->
+    <div class="side-section">
+      <div class="side-label">Waypoint Kuyruğu</div>
+      <div id="wp-scroll">
+        <div id="wp-empty">Henüz rota yok</div>
+      </div>
+    </div>
+
+    <!-- Log -->
+    <div id="log-wrap">
+      <div class="side-label" style="padding:12px 14px 0">Sistem Logu</div>
+      <div id="log-box"></div>
+    </div>
+
+  </div>
+
+  <!-- MAP -->
+  <div id="map-wrap">
+    <div id="map"></div>
+    <div id="map-hint">Başlangıç noktasını seçmek için haritaya tıklayın</div>
+  </div>
+
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+<script>
+
+// SOCKET
+const socket = io();
+let isPaused = false;
+
+socket.on('connect', () => {
+  setBadge('conn-badge', '● BAĞLANDI', true);
+  log('Sunucuya bağlanıldı.', 'success');
+});
+socket.on('disconnect', () => {
+  setBadge('conn-badge', '● KESİLDİ', false);
+  log('Bağlantı kesildi!', 'error');
+});
+socket.on('sistem_mesaji', d => log(d.msg, d.type || 'info'));
+
+socket.on('vehicle_update', data => {
+  updateTelemetry(data);
+  updateStatusBadge(data.status || 'BEKLIYOR');
+  if (data.lat && data.lng) updateVehicleMarker(data.lat, data.lng, data.heading || 0);
+});
+
+socket.on('vehicle_status_change', data => {
+  updateStatusBadge(data.status);
+  isPaused = data.paused;
+  syncPauseButtons();
+});
+
+socket.on('route_planned', data => {
+  drawRoute(data.waypoints);
+  buildWpList(data.waypoints);
+  document.getElementById('route-info-section').style.display = 'block';
+  document.getElementById('ri-dist').textContent  = (data.distance_m / 1000).toFixed(2) + ' km';
+  document.getElementById('ri-dur').textContent   = Math.round(data.duration_s / 60) + ' dk';
+  document.getElementById('ri-total').textContent = data.waypoints.length;
+});
+
+socket.on('waypoint_reached', data => {
+  log(`Waypoint geçildi: ${data.lat?.toFixed(5)}, ${data.lng?.toFixed(5)}`, 'success');
+  markWpDone();
+});
+
+socket.on('next_waypoint', data => {
+  document.getElementById('t-wps').textContent = data.remaining ?? '—';
+  markWpActive();
+});
+
+socket.on('route_complete', () => {
+  log('✓ ROTA TAMAMLANDI!', 'success');
+  updateStatusBadge('TAMAMLANDI');
+});
+
+socket.on('route_cleared', () => {
+  clearMapLayers();
+  buildWpList([]);
+  document.getElementById('route-info-section').style.display = 'none';
+  isPaused = false;
+  syncPauseButtons();
+  setHint('Başlangıç noktasını seçmek için haritaya tıklayın');
+});
+
+socket.on('queue_update', data => {
+  isPaused = data.paused;
+  syncPauseButtons();
+});
+
+// ── HARİTA ───────────────────────────────────────────────────────────────────
+const map = L.map('map', {zoomControl: true}).setView([38.714, 35.566], 15);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap', className: 'map-tiles'
+}).addTo(map);
+const st = document.createElement('style');
+st.textContent = '.map-tiles{filter:invert(1) hue-rotate(180deg) brightness(.85) saturate(.7)}';
+document.head.appendChild(st);
+
+const mkIcon = (color, size=12, shape='circle') => L.divIcon({
+  html: `<div style="width:${size}px;height:${size}px;background:${color};border:2px solid #fff;border-radius:${shape==='square'?'3px':'50%'};box-shadow:0 0 8px ${color}"></div>`,
+  iconSize:[size,size], iconAnchor:[size/2,size/2], className:''
+});
+
+const startIcon   = mkIcon('#3fb950');
+const endIcon     = mkIcon('#ff6b35');
+const vehicleIcon = mkIcon('#00e5ff', 14, 'square');
+
+// Harita katmanları
+let startMarker=null, endMarker=null, routeLine=null;
+let vehicleMarker=null, vehiclePath=null, vehiclePathCoords=[];
+
+// Mod & tıklama durumu
+let mode='route', clickStep=0, startLatLng=null;
+
+function setMode(m) {
+  mode = m; clickStep = 0; startLatLng = null;
+  document.getElementById('btn-route').classList.toggle('active', m==='route');
+  document.getElementById('btn-single').classList.toggle('active', m==='single');
+  setHint(m==='route' ? 'Başlangıç noktasını seçmek için haritaya tıklayın'
+                       : 'Hedef noktasını seçmek için haritaya tıklayın');
+}
+
+map.on('click', e => {
+  const {lat, lng} = e.latlng;
+  if (mode === 'single') {
+    if (endMarker) map.removeLayer(endMarker);
+    endMarker = L.marker([lat,lng],{icon:endIcon}).addTo(map).bindPopup('Hedef').openPopup();
+    socket.emit('hedef_belirle', {lat, lng});
+    log(`Tekli hedef: ${lat.toFixed(5)}, ${lng.toFixed(5)}`, 'info');
+    return;
+  }
+  if (clickStep === 0) {
+    if (startMarker) map.removeLayer(startMarker);
+    startLatLng = {lat, lng};
+    startMarker = L.marker([lat,lng],{icon:startIcon}).addTo(map).bindPopup('Başlangıç').openPopup();
+    clickStep = 1;
+    setHint('Hedef noktasını seçin → OSRM rota hesaplanacak');
+    log('Başlangıç noktası seçildi.', 'info');
+  } else {
+    if (endMarker) map.removeLayer(endMarker);
+    endMarker = L.marker([lat,lng],{icon:endIcon}).addTo(map).bindPopup('Hedef').openPopup();
+    clickStep = 0;
+    setHint('Rota hesaplanıyor...');
+    socket.emit('plan_route', {
+      start_lat: startLatLng.lat, start_lng: startLatLng.lng,
+      end_lat: lat, end_lng: lng
+    });
+    log('OSRM rota isteği gönderildi...', 'info');
+  }
+});
+
+function drawRoute(wps) {
+  if (routeLine) map.removeLayer(routeLine);
+  routeLine = L.polyline(wps.map(w=>[w.lat,w.lng]), {
+    color:'#00e5ff', weight:3, opacity:.7, dashArray:'6,8'
+  }).addTo(map);
+  map.fitBounds(routeLine.getBounds(), {padding:[40,40]});
+  setHint('Rota aktif');
+}
+
+function updateVehicleMarker(lat, lng, heading) {
+  vehiclePathCoords.push([lat,lng]);
+  if (!vehicleMarker) {
+    vehicleMarker = L.marker([lat,lng],{icon:vehicleIcon,zIndexOffset:1000}).addTo(map);
+    vehiclePath   = L.polyline(vehiclePathCoords,{color:'#ff6b35',weight:2,opacity:.5}).addTo(map);
+  } else {
+    vehicleMarker.setLatLng([lat,lng]);
+    vehiclePath.setLatLngs(vehiclePathCoords);
+  }
+}
+
+function clearMapLayers() {
+  [routeLine, startMarker, endMarker].forEach(l => { if(l) map.removeLayer(l); });
+  routeLine = startMarker = endMarker = null;
+  if (vehiclePath) { map.removeLayer(vehiclePath); vehiclePath = null; }
+  vehiclePathCoords = [];
+}
+
+// WAYPOINT LİSTESİ
+let wpItems = [], wpActiveIdx = 0;
+
+function buildWpList(wps) {
+  const scroll = document.getElementById('wp-scroll');
+  const empty  = document.getElementById('wp-empty');
+  scroll.innerHTML = '';
+  wpItems = []; wpActiveIdx = 0;
+  if (!wps.length) {
+    scroll.appendChild(Object.assign(document.createElement('div'),{id:'wp-empty',textContent:'Henüz rota yok',style:'font-size:11px;color:var(--muted);font-family:Space Mono,monospace'}));
+    return;
+  }
+  wps.forEach((wp, i) => {
+    const li = document.createElement('div');
+    li.className = 'wp-item' + (i===0?' active':'');
+    li.innerHTML = `<span class="wp-dot"></span>${i+1}. ${wp.lat.toFixed(4)}, ${wp.lng.toFixed(4)}`;
+    scroll.appendChild(li);
+    wpItems.push(li);
+  });
+}
+
+function markWpDone()   { if(wpItems[wpActiveIdx]) wpItems[wpActiveIdx].classList.replace('active','done'); }
+function markWpActive() { wpActiveIdx++; if(wpItems[wpActiveIdx]) wpItems[wpActiveIdx].classList.add('active'); }
+
+// ARAÇ KOMUTLARI
+function pauseVehicle() {
+  socket.emit('pause_vehicle');
+  isPaused = true; syncPauseButtons();
+}
+function resumeVehicle() {
+  socket.emit('resume_vehicle');
+  isPaused = false; syncPauseButtons();
+}
+function clearRoute() {
+  if (!confirm('Rota temizlensin mi?')) return;
+  socket.emit('clear_route');
+}
+
+function syncPauseButtons() {
+  document.getElementById('btn-pause').style.display  = isPaused ? 'none' : '';
+  document.getElementById('btn-resume').style.display = isPaused ? '' : 'none';
+}
+
+// TELEMETRİ
+function updateTelemetry(d) {
+  document.getElementById('t-speed').textContent   = d.speed   != null ? (d.speed * 3.6).toFixed(1) : '—';
+  document.getElementById('t-dist').textContent    = d.dist_to_target != null ? d.dist_to_target.toFixed(0) : '—';
+  document.getElementById('t-heading').textContent = d.heading  != null ? (d.heading * 180 / Math.PI).toFixed(0) : '—';
+  document.getElementById('t-wps').textContent     = d.waypoints_remaining != null ? d.waypoints_remaining : '—';
+}
+
+// DURUM BADGE 
+const statusLabels = {
+  'BEKLIYOR': '● BEKLIYOR', 'HAREKET': '▶ HAREKET',
+  'DURDU':    '⏸ DURDU',    'ENGEL':   '⚠ ENGEL',
+  'TAMAMLANDI': '✓ TAMAMLANDI'
+};
+function updateStatusBadge(status) {
+  const el = document.getElementById('status-badge');
+  el.textContent = statusLabels[status] || status;
+  el.className   = `status-${status}`;
+}
+
+// YARDIMCI 
+function setBadge(id, txt, ok) {
+  const el = document.getElementById(id);
+  el.textContent = txt;
+  el.classList.toggle('connected', ok);
+}
+function setHint(txt) { document.getElementById('map-hint').textContent = txt; }
+function log(msg, type='info') {
+  const box = document.getElementById('log-box');
+  const el  = document.createElement('div');
+  const ts  = new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  el.className   = `log-entry ${type}`;
+  el.textContent = `${ts}  ${msg}`;
+  box.prepend(el);
+  while(box.children.length > 60) box.removeChild(box.lastChild);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,112 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/vehicles/protos/bmw/BmwX5.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/devices/sick/protos/SickLms291.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/Parquetry.proto"
+
+WorldInfo {
+}
+Viewpoint {
+  orientation -0.1615208343181894 0.018095961488436993 0.9867033780518667 2.6698610065615385
+  position 50.58772260017209 -13.584116504233577 16.080699233865765
+}
+TexturedBackground {
+}
+BmwX5 {
+  hidden position_0_0 2.2915600803438154e-11
+  hidden position2_0_0 3483.0474364772576
+  hidden position_0_1 1.8548302383408168e-11
+  hidden position2_0_1 3549.7584324674285
+  hidden position_0_2 3475.0935857763343
+  hidden position_0_3 3538.605948496507
+  hidden position_0_4 1.0500000000000007
+  hidden position_0_5 1.0500000000000007
+  hidden position_0_9 1.9335518924208373e-07
+  hidden linearVelocity_0 -6.208805349504776e-08 1.4961573703635634e-06 -6.585482227441389e-06
+  hidden angularVelocity_0 -6.062219672155108e-06 -2.3067477272271184e-07 5.846932057383221e-10
+  hidden rotation_1 -1.1457800401719079e-11 -1 -6.102747466014265e-12 2.1627762997667253
+  hidden linearVelocity_1 -4.268879486795673e-08 9.642008854926068e-07 3.3475116698024998e-06
+  hidden angularVelocity_1 -5.300302823725152e-06 -2.1898339699791104e-07 7.877053405693788e-10
+  hidden rotation_2 9.274151191704084e-12 1 7.650574254410407e-11 6.0419192181417465
+  hidden linearVelocity_2 -4.264031321057166e-08 9.625472083758718e-07 3.2585913853422128e-06
+  hidden angularVelocity_2 -5.2993906154572445e-06 -2.1701161470735508e-07 7.452764246124891e-10
+  hidden rotation_3 0 0.9999999999999999 0 5.791074401156615
+  hidden linearVelocity_3 -4.064374719557664e-08 9.99295293949273e-07 -1.3040086753911359e-05
+  hidden angularVelocity_3 -2.665111462508153e-06 -1.3685705873273696e-07 5.908866190382031e-10
+  hidden rotation_4 0 -1 0 5.11056475277962
+  hidden linearVelocity_4 -4.062314389448989e-08 9.985179480514811e-07 -1.3129484233225716e-05
+  hidden angularVelocity_4 -2.663038282544933e-06 -1.367894783503413e-07 5.906830754879844e-10
+  hidden translation_22 0.5634203137281402 1.3679146929410546 -0.41237349115078414
+  hidden rotation_22 -0.6131273759850641 0.014426526493766214 -0.7898523255337002 1.0500000000000007
+  hidden translation_23 0.2207727949168441 1.6381378943282505 -0.2200092028066244
+  hidden rotation_23 -0.5594983700538186 -0.0358078956834444 -0.8280575876796517 1.0500000000000007
+  hidden translation_27 -6.604687685651811e-08 3.833274567766054e-07 -7.413425395785822e-08
+  hidden rotation_27 0.7466598432279095 0 -0.6652060421485011 1.931411236050088e-07
+  translation 0.005574857505766306 -0.19896853967059358 0.4705701068245604
+  rotation -0.010917101721110625 -0.011226959989212502 -0.9998773786117033 1.5429355668757467
+  controller "FinalController"
+  sensorsSlotFront [
+    DistanceSensor {
+      name "ds0"
+    }
+    SickLms291 {
+      translation 0.06 0 0
+    }
+  ]
+  sensorsSlotTop [
+    Compass {
+    }
+    Camera {
+      translation 0.72 0 -0.05
+      children [
+        Pose {
+          translation -0.05 0 0
+          rotation 0 -1 0 1.5708
+          children [
+            Shape {
+              appearance PBRAppearance {
+                baseColor 0.8 0.8 0.8
+                roughness 1
+                metalness 0
+              }
+              geometry Cylinder {
+                height 0.1
+                radius 0.04
+              }
+            }
+          ]
+        }
+      ]
+      fieldOfView 1
+      width 128
+    }
+  ]
+  sensorsSlotCenter [
+    GPS {
+    }
+    Gyro {
+    }
+    Display {
+      width 200
+      height 150
+    }
+  ]
+}
+TexturedBackgroundLight {
+}
+Solid {
+  children [
+    Shape {
+      appearance Parquetry {
+      }
+      geometry Box {
+        size 1000 1000 0.1
+      }
+    }
+  ]
+  boundingObject Box {
+    size 1000 1000 1
+  }
+}
